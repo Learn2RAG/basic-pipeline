@@ -22,7 +22,7 @@ if __name__ == "__main__":
     query = "What approach did Arjun Singh's campaign use to respond to voters' concerns on social media platforms during the municipal elections in Delhi?"
     results = search.search(query, user_config, opt_config)
     for result in results:
-        print(result.metadata["source"])
+        print(f"ID: {result.id}, Path: {result.payload['path']}, Score: {result.score}")
 
     answer = generate.generate(query, results)
 

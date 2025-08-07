@@ -3,7 +3,7 @@ from langchain.prompts import SystemMessagePromptTemplate, HumanMessagePromptTem
 from llm import llm
 
 def generate(query, search_results) -> str:
-    context = "\n\n".join([doc.page_content for doc in search_results])
+    context = "\n\n".join([result.payload['content'] for result in search_results])
     system_message = SystemMessagePromptTemplate.from_template("""
     # Role and Objective
     You will act as a smart AI chatbot that answers questions by citing from the provided information.
