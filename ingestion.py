@@ -6,7 +6,7 @@ from langchain.text_splitter import RecursiveCharacterTextSplitter
 from qdrant import Qdrant
 from qdrant_client.models import PointStruct
 import loaders
-from FlagEmbedding import BGEM3FlagModel
+from embeddings import create_embeddings
 
 
 
@@ -37,14 +37,7 @@ def index(user_config, opt_config):
     chunks_content = [chunk.page_content for chunk in chunks]
     # Todo: handle different vector lengths for batch encoding when using sparse vectors
 
-    model = BGEM3FlagModel("BAAI/bge-m3", use_fp16=True)
-    embeddings = model.encode(
-        chunks_content,
-        batch_size=512,
-        return_dense=True,
-        return_sparse=False,
-        return_colbert_vecs=False,
-    ) # Todo Device (nutzt momentan alle verfügbaren GPUs)
+    embeddings = create_embeddings(chunks_content, opt_config["embedding_model"])
 
     # TODO: Abfrage, ob Inhalt schon in Collection
 
