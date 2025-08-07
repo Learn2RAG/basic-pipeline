@@ -1,5 +1,6 @@
 import json
 from uuid import uuid4
+import hashlib
 
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 
@@ -35,6 +36,7 @@ def index(user_config, opt_config):
 
 
     chunks_content = [chunk.page_content for chunk in chunks]
+    chunk_hash = [hashlib.md5(chunk.page_content.encode()).hexdigest() for chunk in chunks]
     # Todo: handle different vector lengths for batch encoding when using sparse vectors
 
     embeddings = create_embeddings(chunks_content, opt_config["embedding_model"])
@@ -60,7 +62,7 @@ def index(user_config, opt_config):
                     payload={
                         "content": sample['page_content'],
                         "path": sample['metadata']['source'],
-                        "content_hash": 'TODO'# sample["c_documentid"] #TODO content hash
+                        "content_hash": sample['chunk_hash']
                     },
                 ),
             ],
@@ -68,10 +70,11 @@ def index(user_config, opt_config):
 
 
     chunks_with_embeddings = [
-        dict(chunk) | {"dense_vec": dense}
-        for chunk, dense in zip(
+        dict(chunk) | {"dense_vec": dense, "chunk_hash": c_hash}
+        for chunk, dense, c_hash in zip(
             chunks,
-            embeddings["dense_vecs"]
+            embeddings["dense_vecs"],
+            chunk_hash
         )
     ]
 
