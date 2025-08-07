@@ -2,10 +2,12 @@ import json
 from uuid import uuid4
 
 from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain_community.embeddings import HuggingFaceEmbeddings
 
 from qdrant import Qdrant
+from qdrant_client.models import PointStruct
 import loaders
+from FlagEmbedding import BGEM3FlagModel
+
 
 
 def index(user_config, opt_config):
@@ -20,20 +22,65 @@ def index(user_config, opt_config):
         chunk_size=opt_config["chunk_size"], chunk_overlap=opt_config["chunk_overlap"]
     )
     chunks = text_splitter.split_documents(all_documents)
+    chunks = chunks[:3] # TODO: remove!
 
-    # Initialize embeddingmodel
-    encoder = HuggingFaceEmbeddings(model_name=opt_config["embedding_model"])
+
+    collection_name = user_config["collection_name"]
 
     # Init vector store
     qdrant = Qdrant(
-        collection_name=user_config["collection_name"],
-        encoder=encoder,
+        collection_name=collection_name,
         vector_size=opt_config["vector_size"][opt_config["embedding_model"]],
     )
 
-    # Store documents in Qdrant via LangChain
-    # TODO: do not ingest same chunks twice
-    # TODO: ingest without using langchain
-    # TODO: add logging
-    uuids = [str(uuid4()) for _ in range(len(chunks))]
-    qdrant.vector_store.add_documents(documents=chunks, ids=uuids)
+
+    chunks_content = [chunk.page_content for chunk in chunks]
+    # Todo: handle different vector lengths for batch encoding when using sparse vectors
+
+    model = BGEM3FlagModel("BAAI/bge-m3", use_fp16=True)
+    embeddings = model.encode(
+        chunks_content,
+        batch_size=512,
+        return_dense=True,
+        return_sparse=False,
+        return_colbert_vecs=False,
+    ) # Todo Device (nutzt momentan alle verfügbaren GPUs)
+
+    # TODO: Abfrage, ob Inhalt schon in Collection
+
+    # falls nein: insert
+    def insert(sample: dict):
+        qdrant.client.upsert(
+            collection_name=collection_name,
+            wait=True,
+            points=[
+                PointStruct(
+                    id=uuid4().hex,
+                    vector={
+                        "dense": sample["dense_vec"],
+                        # "sparse": SparseVector(
+                        #     indices=[int(x) for x in sample["sparse_vec"].keys()],
+                        #     values=sample["sparse_vec"].values(),
+                        # ),
+                        # "colbert": sample["colbert_vec"],
+                    },
+                    payload={
+                        "content": sample['page_content'],
+                        "path": sample['metadata']['source'],
+                        "content_hash": 'TODO'# sample["c_documentid"] #TODO content hash
+                    },
+                ),
+            ],
+        )
+
+
+    chunks_with_embeddings = [
+        dict(chunk) | {"dense_vec": dense}
+        for chunk, dense in zip(
+            chunks,
+            embeddings["dense_vecs"]
+        )
+    ]
+
+    for sample in chunks_with_embeddings:
+        insert(sample)
