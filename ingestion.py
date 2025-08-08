@@ -82,15 +82,16 @@ def index(user_config, opt_config):
     
         return len(result) > 0
 
-
-    chunks_with_embeddings = [
-        dict(chunk) | {"dense_vec": dense, "chunk_hash": c_hash}
-        for chunk, dense, c_hash in zip(
-            chunks,
-            embeddings["dense_vecs"],
-            chunk_hash
-        )
-    ]
+    if isinstance(embeddings, dict) and "dense_vecs" in embeddings:
+        chunks_with_embeddings = [
+            dict(chunk) | {"dense_vec": dense, "chunk_hash": c_hash}
+            for chunk, dense, c_hash in zip(chunks, embeddings["dense_vecs"], chunk_hash)
+        ]
+    else:
+        chunks_with_embeddings = [
+            dict(chunk) | {"dense_vec": dense, "chunk_hash": c_hash}
+            for chunk, dense, c_hash in zip(chunks, embeddings, chunk_hash)
+        ]
 
     for sample in chunks_with_embeddings:
         if not point_exists(qdrant, collection_name, sample['metadata']['source'], sample['chunk_hash']):
