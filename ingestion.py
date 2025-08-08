@@ -1,14 +1,46 @@
-import json
 from uuid import uuid4
 import hashlib
+from typing import Dict
 
 from langchain.text_splitter import RecursiveCharacterTextSplitter
-
 from qdrant import Qdrant
 from qdrant_client.models import PointStruct, Filter, FieldCondition, MatchValue
+
 import loaders
 from embeddings import create_embeddings
 
+
+def point_exists(qdrant: Qdrant, collection_name: str, path: str, chunk_hash:str) -> bool:
+    filter = Filter(
+        must=[
+            FieldCondition(key="path", match=MatchValue(value=path)),
+            FieldCondition(key="content_hash", match=MatchValue(value=chunk_hash)),
+        ]
+    )
+    result, _ = qdrant.client.scroll(
+        collection_name=collection_name, scroll_filter=filter, limit=1
+    )
+    return len(result) > 0
+
+
+def insert(qdrant: Qdrant, collection_name: str, sample: Dict):
+    point = PointStruct(
+        id=uuid4().hex,
+        vector={
+            "dense": sample["dense_vec"],
+            # "sparse": SparseVector(
+            #     indices=[int(x) for x in sample["sparse_vec"].keys()],
+            #     values=sample["sparse_vec"].values(),
+            # ),
+            # "colbert": sample["colbert_vec"],
+        },
+        payload={
+            "content": sample["page_content"],
+            "path": sample["metadata"]["source"],
+            "content_hash": sample["chunk_hash"],
+        },
+    )
+    qdrant.client.upsert(collection_name=collection_name, wait=True, points=[point])
 
 
 def index(user_config, opt_config):
@@ -41,46 +73,6 @@ def index(user_config, opt_config):
 
     embeddings = create_embeddings(chunks_content, opt_config["embedding_model"])
 
-    def insert(sample: dict):
-        qdrant.client.upsert(
-            collection_name=collection_name,
-            wait=True,
-            points=[
-                PointStruct(
-                    id=uuid4().hex,
-                    vector={
-                        "dense": sample["dense_vec"],
-                        # "sparse": SparseVector(
-                        #     indices=[int(x) for x in sample["sparse_vec"].keys()],
-                        #     values=sample["sparse_vec"].values(),
-                        # ),
-                        # "colbert": sample["colbert_vec"],
-                    },
-                    payload={
-                        "content": sample['page_content'],
-                        "path": sample['metadata']['source'],
-                        "content_hash": sample['chunk_hash']
-                    },
-                ),
-            ],
-        )
-
-
-    def point_exists(client, collection_name, path, chunk_hash):
-        filter = Filter(
-            must=[
-                FieldCondition(key="path", match=MatchValue(value=path)),
-                FieldCondition(key="content_hash", match=MatchValue(value=chunk_hash))
-            ]
-        )
-        
-        result, _ = qdrant.client.scroll(
-            collection_name=collection_name,
-            scroll_filter=filter,
-            limit=1
-        )
-    
-        return len(result) > 0
 
     if isinstance(embeddings, dict) and "dense_vecs" in embeddings:
         chunks_with_embeddings = [
@@ -95,4 +87,4 @@ def index(user_config, opt_config):
 
     for sample in chunks_with_embeddings:
         if not point_exists(qdrant, collection_name, sample['metadata']['source'], sample['chunk_hash']):
-            insert(sample)
+            insert(qdrant, collection_name, sample)
