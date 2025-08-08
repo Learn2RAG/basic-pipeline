@@ -5,7 +5,7 @@ import hashlib
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 
 from qdrant import Qdrant
-from qdrant_client.models import PointStruct
+from qdrant_client.models import PointStruct, Filter, FieldCondition, MatchValue
 import loaders
 from embeddings import create_embeddings
 
@@ -41,9 +41,6 @@ def index(user_config, opt_config):
 
     embeddings = create_embeddings(chunks_content, opt_config["embedding_model"])
 
-    # TODO: Abfrage, ob Inhalt schon in Collection
-
-    # falls nein: insert
     def insert(sample: dict):
         qdrant.client.upsert(
             collection_name=collection_name,
@@ -69,6 +66,23 @@ def index(user_config, opt_config):
         )
 
 
+    def point_exists(client, collection_name, path, chunk_hash):
+        filter = Filter(
+            must=[
+                FieldCondition(key="path", match=MatchValue(value=path)),
+                FieldCondition(key="content_hash", match=MatchValue(value=chunk_hash))
+            ]
+        )
+        
+        result, _ = qdrant.client.scroll(
+            collection_name=collection_name,
+            scroll_filter=filter,
+            limit=1
+        )
+    
+        return len(result) > 0
+
+
     chunks_with_embeddings = [
         dict(chunk) | {"dense_vec": dense, "chunk_hash": c_hash}
         for chunk, dense, c_hash in zip(
@@ -79,4 +93,5 @@ def index(user_config, opt_config):
     ]
 
     for sample in chunks_with_embeddings:
-        insert(sample)
+        if not point_exists(qdrant, collection_name, sample['metadata']['source'], sample['chunk_hash']):
+            insert(sample)
