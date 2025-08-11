@@ -53,5 +53,10 @@ tests/data/html/AIAct.html:
 	wget --output-document $@ "https://eur-lex.europa.eu/legal-content/DE/TXT/HTML/?uri=OJ:L_202401689"
 ```
 
+### Explanations
+
+``user_config.json`` are the configurations we expect to get from the UI
+``opt_config.json`` are values we later want to optimize
+``loaded_documents.json`` should mock the input extracted from AP2 importers
 
 

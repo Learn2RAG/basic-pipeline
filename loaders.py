@@ -40,7 +40,7 @@ def pdf_loader(file_path: str) -> list[Document]:
 
 def sync_pdf_loader(file_path: str) -> list[Document]:
     all_documents = []
-    for file in os.listdir(file_path)[:20]:
+    for file in os.listdir(file_path):
         if file.endswith(".pdf"):
             loader = PyPDFLoader(
                 os.path.join(file_path, file), mode="single"

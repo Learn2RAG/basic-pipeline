@@ -55,8 +55,6 @@ def index(user_config, opt_config):
         chunk_size=opt_config["chunk_size"], chunk_overlap=opt_config["chunk_overlap"]
     )
     chunks = text_splitter.split_documents(all_documents)
-    chunks = chunks[:3] # TODO: remove!
-
 
     collection_name = user_config["collection_name"]
 
