@@ -1,0 +1,6 @@
+{
+  "experiment_description": "insert experiment description here",
+  "eval_data_path": "./data/data/repliqa_4-00000-of-00001.parquet",
+  "langfuse_dataset_name": "repliqa_4_10samples",
+  "n_samples": 10
+}
